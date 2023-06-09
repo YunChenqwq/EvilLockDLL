@@ -118,16 +118,15 @@ BOOL GetPhysicalDriveHandle(HANDLE& handle, int DriveNumber)
 	return true;
 }
 /*SCSI读写扇区*/
-BOOL DiskSectorIO(HANDLE hDrive,int Id, int num, unsigned char* buffer, BOOL write) {
-	ULONGLONG offset = 0;
-	DWORD bytesRead = 0;
+BOOL DiskSectorIO(HANDLE hDrive, int Id, int num, unsigned char* buffer, BOOL write) {
+	if (!hDrive || !buffer || num < 1) return FALSE;
 
-	offset = Id * 512;
-	if (buffer == NULL || num == 0) {
-		return FALSE;
-	}
-	BOOL result = SCSISectorIO(hDrive, offset, buffer, num * 512, write);
-	return result;
+	LARGE_INTEGER liOffset = { 0 };
+	ULONGLONG ullStartSector = (ULONGLONG)Id;
+	liOffset.QuadPart = ullStartSector * PHYSICAL_SECTOR_SIZE;
+
+	BOOL bRet = SCSISectorIO(hDrive, liOffset.QuadPart, buffer, num, write);
+	return bRet;
 }
 
 /*获取物理驱动器数量*/
@@ -197,7 +196,7 @@ int GetSystemDiskPhysicalNumber(void)
 	diskLetter = sysPath[0];
 	CHAR path[256];
 	sprintf(path, "\\\\.\\%c:", diskLetter);
-	hDevice = CreateFile(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+	hDevice = CreateFileA(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
 	if (hDevice == INVALID_HANDLE_VALUE)
 	{
 		return -1;
