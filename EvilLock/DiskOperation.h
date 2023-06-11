@@ -22,4 +22,4 @@ extern "C" __declspec(dllexport)int GetPhysicalDriveNumber();
 extern "C" __declspec(dllexport)std::string GetPartitiontype(HANDLE hDevice);
 extern "C" __declspec(dllexport)int GetSystemDiskPhysicalNumber();
 extern "C" __declspec(dllexport)int SetDriveLetterToEFI(const char* devicePath, char driveLetter);
-extern "C" __declspec(dllexport)void  LogicalLock();
+//extern "C" __declspec(dllexport)void  LogicalLock();
