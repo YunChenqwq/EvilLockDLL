@@ -12,6 +12,4 @@ EvilLock的动态链接库与说明文档
 你的捐赠是我更新的动力 捐赠请看赞赏码(∠·ω< )⌒★
 
 
-</a>
-  ![text] (https://github.com/YunChenqwq/EvilLockDLL/tree/main/png/zanshangma.jpg)
-</a>
+  ![text](https://github.com/YunChenqwq/EvilLockDLL/tree/main/png/zanshangma.jpg)
