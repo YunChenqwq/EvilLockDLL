@@ -18,37 +18,43 @@ struct MBR {
 	} partition[4];
 	unsigned short signature; // MBR签名（0xAA55）
 };
-BOOL SCSIBuild10CDB(PSCSI_PASS_THROUGH_DIRECT srb, ULONGLONG offset, ULONG length, BOOLEAN Write) {
+BOOL SCSIBuild16CDB(PSCSI_PASS_THROUGH_DIRECT srb, ULONGLONG offset, ULONG length, BOOLEAN Write) {
 	if (!srb || offset >= 0x20000000000 || length < 1)
 		return FALSE;
 	LPBYTE cdb = srb->Cdb;
 	if (Write == FALSE) {
-		cdb[0] = SCSIOP_READ;
+		cdb[0] = SCSIOP_READ16;
 		cdb[1] = 0;
 	}
 	else {
-		cdb[0] = SCSIOP_WRITE;
+		cdb[0] = SCSIOP_WRITE16;
 		cdb[1] = 0;
 	}
-	DWORD LBA = (DWORD)(offset / PHYSICAL_SECTOR_SIZE);
-	cdb[2] = ((LPBYTE)&LBA)[3];
-	cdb[3] = ((LPBYTE)&LBA)[2];
-	cdb[4] = ((LPBYTE)&LBA)[1];
-	cdb[5] = ((LPBYTE)&LBA)[0];
-	cdb[6] = 0x00;
+	ULONGLONG LBA = offset / PHYSICAL_SECTOR_SIZE;
+	cdb[2] = ((LPBYTE)&LBA)[7];
+	cdb[3] = ((LPBYTE)&LBA)[6];
+	cdb[4] = ((LPBYTE)&LBA)[5];
+	cdb[5] = ((LPBYTE)&LBA)[4];
+	cdb[6] = ((LPBYTE)&LBA)[3];
+	cdb[7] = ((LPBYTE)&LBA)[2];
+	cdb[8] = ((LPBYTE)&LBA)[1];
+	cdb[9] = ((LPBYTE)&LBA)[0];
 
-	WORD CDBTLen = (WORD)(length / PHYSICAL_SECTOR_SIZE);
-	cdb[7] = ((LPBYTE)&CDBTLen)[1];
-	cdb[8] = ((LPBYTE)&CDBTLen)[0];
-	cdb[9] = 0x00;
-
+	UINT32 CDBTLen = length / PHYSICAL_SECTOR_SIZE;
+	cdb[10] = ((LPBYTE)&CDBTLen)[3];
+	cdb[11] = ((LPBYTE)&CDBTLen)[2];
+	cdb[12] = ((LPBYTE)&CDBTLen)[1];
+	cdb[13] = ((LPBYTE)&CDBTLen)[0];
+	cdb[14] = 0x00;
+	cdb[15] = 0x00;
 	return TRUE;
 }
+
 BOOL SCSISectorIO(HANDLE hDrive, ULONGLONG offset, LPBYTE buffer, UINT buffSize, BOOLEAN write) {
 	SCSI_PASS_THROUGH_DIRECT srb = { 0 };
 	DWORD bytesReturned = 0;
 	IO_SCSI_CAPABILITIES scap = { 0 };
-	DWORD maxTransfLen = 8192;
+	DWORD maxTransfLen = 8192;//4kb
 	DWORD curSize = buffSize;
 	LPBYTE tempBuff = NULL;
 	static bool OneShotLog = false;
@@ -64,7 +70,7 @@ BOOL SCSISectorIO(HANDLE hDrive, ULONGLONG offset, LPBYTE buffer, UINT buffSize,
 
 	RtlZeroMemory(&srb, sizeof(SCSI_PASS_THROUGH_DIRECT));
 	srb.Length = sizeof(SCSI_PASS_THROUGH_DIRECT);
-	srb.CdbLength = 0xa;
+	srb.CdbLength = 0x10;
 	srb.SenseInfoLength = 0;
 	srb.SenseInfoOffset = sizeof(SCSI_PASS_THROUGH_DIRECT);
 	if (write)
@@ -85,7 +91,7 @@ BOOL SCSISectorIO(HANDLE hDrive, ULONGLONG offset, LPBYTE buffer, UINT buffSize,
 		}
 
 		srb.DataBuffer = buffer;
-		retVal = SCSIBuild10CDB(&srb, offset, srb.DataTransferLength, write);
+		retVal = SCSIBuild16CDB(&srb, offset, srb.DataTransferLength, write);
 		retVal = DeviceIoControl(hDrive, IOCTL_SCSI_PASS_THROUGH_DIRECT, (LPVOID)&srb, sizeof(SCSI_PASS_THROUGH_DIRECT),
 			NULL, 0, &bytesReturned, NULL);
 		lastErr = GetLastError();
@@ -105,6 +111,7 @@ BOOL SCSISectorIO(HANDLE hDrive, ULONGLONG offset, LPBYTE buffer, UINT buffSize,
 		return TRUE;
 	}
 }
+
 /*获取驱动器句柄*/
 BOOL GetPhysicalDriveHandle(HANDLE& handle, int DriveNumber)
 {
@@ -148,7 +155,7 @@ int GetPhysicalDriveNumber()
 	return drivenumber;
 }
 /*获取硬盘分区类型*/
-string GetPartitiontype(HANDLE hDevice)
+const char* GetPartitiontype(HANDLE hDevice)
 {
 		int nDiskBufferSize = sizeof(PARTITION_INFORMATION_EX);
 		PARTITION_INFORMATION_EX* lpDiskPartinfo_ex = (PARTITION_INFORMATION_EX*)malloc(nDiskBufferSize);
