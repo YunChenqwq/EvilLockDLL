@@ -4,7 +4,7 @@ EvilLock的动态链接库与说明文档
 - [用户操作接口](https://github.com/YunChenqwq/EvilLockDLL/blob/main/2.md)
 - [其他操作接口](https://github.com/YunChenqwq/EvilLockDLL/blob/main/3.md)
 - [特效操作接口](https://github.com/YunChenqwq/EvilLockDLL/blob/main/4.md)
- 
+ - [gitee](https://gitee.com/YunChenqwq/EvilLockDLL)
  项目QQ群:790319489
 
 易模块 以及c++锁机头 锁芯 请关注[项目]https://github.com/YunChenqwq/EvilLocker
