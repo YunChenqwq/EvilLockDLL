@@ -11,5 +11,5 @@ EvilLock的动态链接库与说明文档
 喜欢就给github来个star吧qwq~
 你的捐赠是我更新的动力 捐赠请看赞赏码(∠·ω< )⌒★
 </a>
-   <img align="center" alt="Top Langs" src="https://github.com/YunChenqwq/EvilLockDLL/tree/main/png/zanshangma.jpg" />  
+  ![text] (https://github.com/YunChenqwq/EvilLockDLL/tree/main/png/zanshangma.jpg)
 </a>
